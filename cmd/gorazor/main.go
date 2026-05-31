@@ -27,6 +27,7 @@ func main() {
 	quick := flag.Bool("q", false, "enable quick mode; skip template render optimzation")
 	namespacePrefix := flag.String("prefix", "", "tpl namespace prefix")
 	nameNotChange := flag.Bool("nameNotChange", false, "do not change name of the template")
+	compact := flag.Bool("compact", false, "enable compact mode; minify generated HTML")
 
 	flag.Parse()
 
@@ -42,6 +43,7 @@ func main() {
 	options.NoLineNumber = *noLine
 	options.QuickMode = *quick
 	options.TemplateNamespacePrefix = *namespacePrefix
+	options.CompactMode = *compact
 
 	if len(flag.Args()) != 2 {
 		flag.Usage()

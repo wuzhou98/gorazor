@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -46,6 +47,143 @@ func getValStr(e interface{}) string {
 	}
 }
 
+func isWhitespace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+func compactTag(tag string) string {
+	var result strings.Builder
+	inQuote := byte(0)
+	n := len(tag)
+	i := 0
+	for i < n {
+		c := tag[i]
+		if inQuote != 0 {
+			if c == inQuote {
+				inQuote = 0
+			}
+			result.WriteByte(c)
+			i++
+		} else if c == '"' || c == '\'' {
+			inQuote = c
+			result.WriteByte(c)
+			i++
+		} else if isWhitespace(c) {
+			for i < n && isWhitespace(tag[i]) {
+				i++
+			}
+			if i < n && tag[i] != '>' && tag[i] != '/' {
+				result.WriteByte(' ')
+			}
+		} else {
+			result.WriteByte(c)
+			i++
+		}
+	}
+	return result.String()
+}
+
+func compactHTML(html string) string {
+	var result strings.Builder
+	inPre := false
+	inTagName := ""
+
+	i := 0
+	n := len(html)
+	for i < n {
+		if html[i] == '<' {
+			// Scan the entire tag up to '>'
+			j := i
+			inQuote := byte(0)
+			for j < n {
+				c := html[j]
+				if inQuote != 0 {
+					if c == inQuote {
+						inQuote = 0
+					}
+				} else if c == '"' || c == '\'' {
+					inQuote = c
+				} else if c == '>' {
+					j++
+					break
+				}
+				j++
+			}
+
+			tagContent := html[i:j]
+
+			// Now parse the tag name from tagContent
+			if len(tagContent) > 1 {
+				tagName := ""
+				isClosing := false
+				k := 1
+				if tagContent[k] == '/' {
+					isClosing = true
+					k++
+				}
+				startTagName := k
+				for k < len(tagContent) && tagContent[k] != '>' && tagContent[k] != ' ' && tagContent[k] != '\t' && tagContent[k] != '\n' && tagContent[k] != '/' {
+					k++
+				}
+				tagName = strings.ToLower(tagContent[startTagName:k])
+
+				if isClosing {
+					if tagName == inTagName {
+						inPre = false
+						inTagName = ""
+					}
+				} else {
+					if tagName == "pre" || tagName == "textarea" || tagName == "script" || tagName == "style" {
+						inPre = true
+						inTagName = tagName
+					}
+				}
+			}
+
+			result.WriteString(compactTag(tagContent))
+			i = j
+			continue
+		}
+
+		if inPre {
+			result.WriteByte(html[i])
+			i++
+		} else {
+			if isWhitespace(html[i]) {
+				// Scan all consecutive whitespaces
+				for i < n && isWhitespace(html[i]) {
+					i++
+				}
+
+				// Check character before and after
+				var prevChar byte
+				if result.Len() > 0 {
+					prev := result.String()
+					prevChar = prev[len(prev)-1]
+				}
+				var nextChar byte
+				if i < n {
+					nextChar = html[i]
+				}
+
+				// Omit whitespace completely if it is between '>' and '<'
+				if prevChar == '>' && nextChar == '<' {
+					// Omit it
+				} else {
+					// Otherwise collapse to a single space, but only if we are not at the very start/end of the string
+					if result.Len() > 0 && i < n {
+						result.WriteByte(' ')
+					}
+				}
+			} else {
+				result.WriteByte(html[i])
+				i++
+			}
+		}
+	}
+	return result.String()
+}
+
 // Part represent gorazor template parts
 type Part struct {
 	ptype int
@@ -55,29 +193,44 @@ type Part struct {
 
 // Compiler generate go code for gorazor template
 type Compiler struct {
-	ctx        context.Context
-	inputPath  string
-	tplPath    string
-	ast        *Ast
-	buf        string //the final result
-	isLayout   bool
-	layout     string
-	firstBLK   int
-	params     []string
-	paramNames []string
-	parts      []Part
-	imports    map[string]bool
-	options    Option
-	dir        string
-	file       string
+	ctx         context.Context
+	currentLine int
+	inputPath   string
+	tplPath     string
+	ast         *Ast
+	buf         string //the final result
+	isLayout    bool
+	layout      string
+	firstBLK    int
+	params      []string
+	paramNames  []string
+	parts       []Part
+	imports     map[string]bool
+	options     Option
+	dir         string
+	file        string
 }
 
 type compilerError struct {
 	err error
 }
 
-func (cp *Compiler) errorf(format string, args ...interface{}) {
-	panic(compilerError{err: fmt.Errorf(format, args...)})
+func (cp *Compiler) errorf(line int, format string, args ...interface{}) {
+	if line <= 0 {
+		line = cp.currentLine
+	}
+	msg := fmt.Sprintf(format, args...)
+	snippet := ""
+	if line > 0 && cp.inputPath != "" {
+		if content, err := os.ReadFile(cp.inputPath); err == nil {
+			lines := strings.Split(string(content), "\n")
+			if line <= len(lines) {
+				snippet = fmt.Sprintf("\n\nContext:\n---> %d: %s\n", line, strings.TrimSpace(lines[line-1]))
+			}
+		}
+	}
+	detailErr := fmt.Errorf("compilation error in %s:%d: %s%s", cp.inputPath, line, msg, snippet)
+	panic(compilerError{err: detailErr})
 }
 
 func (cp *Compiler) addPart(part Part) {
@@ -148,6 +301,9 @@ func (cp *Compiler) genPart() {
 
 	for _, p := range cp.parts {
 		if p.ptype == CMKP && p.value != "" {
+			if cp.options.CompactMode {
+				p.value = compactHTML(p.value)
+			}
 			// do some escapings
 			for strings.HasSuffix(p.value, "\n") {
 				p.value = p.value[:len(p.value)-1]
@@ -184,15 +340,16 @@ func makeCompiler(ctx context.Context, ast *Ast, options Option, input string) *
 		file = Capitalize(file)
 	}
 	cp := &Compiler{
-		ctx:    ctx,
-		ast:    ast,
-		buf:    "",
-		layout: "", firstBLK: 0,
-		params: []string{}, parts: []Part{},
-		imports: map[string]bool{},
-		options: options,
-		dir:     dir,
-		file:    file,
+		ctx:         ctx,
+		currentLine: 1,
+		ast:         ast,
+		buf:         "",
+		layout:      "", firstBLK: 0,
+		params:      []string{}, parts: []Part{},
+		imports:     map[string]bool{},
+		options:     options,
+		dir:         dir,
+		file:        file,
 	}
 
 	if dir == "layout" {
@@ -230,14 +387,14 @@ func (cp *Compiler) settleLayout(layoutFunc string) {
 
 	cp.layout = cp.layout + "/" + layoutFunc
 	if !exists(path) {
-		cp.errorf("Can't find layout: %s [%s]", cp.layout, cp.file)
+		cp.errorf(1, "Can't find layout: %s [%s]", cp.layout, cp.file)
 	}
 
 	if len(cp.options.LayoutCache.Get(cp.layout)) == 0 {
 		//TODO, bad for performance
 		_cp, err := run(cp.ctx, path, cp.options)
 		if err != nil {
-			cp.errorf("failed to compile layout %s: %v", path, err)
+			cp.errorf(1, "failed to compile layout %s: %v", path, err)
 		}
 		cp.options.LayoutCache.Set(cp.layout, _cp.params)
 	}
@@ -274,7 +431,16 @@ func (cp *Compiler) processImports(content string) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", "package main\n"+content, parser.ImportsOnly)
 	if err != nil {
-		cp.errorf("failed to parse imports block: %v", err)
+		line := 1
+		if matches := regexp.MustCompile(`(?:^|:)(\d+):`).FindStringSubmatch(err.Error()); len(matches) > 1 {
+			if l, e := strconv.Atoi(matches[1]); e == nil {
+				line = l - 1
+				if line < 1 {
+					line = 1
+				}
+			}
+		}
+		cp.errorf(line, "failed to parse imports block: %v", err)
 	}
 	
 	for _, s := range f.Imports {
@@ -454,6 +620,7 @@ func (cp *Compiler) visitAstBlk(ast *Ast) {
 				continue
 			}
 			if token, ok := c.(Token); ok {
+				cp.currentLine = token.Line
 				cp.visitBLK(token)
 			} else {
 				cp.visitAst(c.(*Ast))
@@ -468,6 +635,7 @@ func (cp *Compiler) visitAst(ast *Ast) {
 		cp.firstBLK = 1
 		for _, c := range ast.Children {
 			if token, ok := c.(Token); ok {
+				cp.currentLine = token.Line
 				cp.visitMKP(token)
 			} else {
 				cp.visitAst(c.(*Ast))
@@ -479,8 +647,9 @@ func (cp *Compiler) visitAst(ast *Ast) {
 		cp.firstBLK = 1
 		nonExp := ast.hasNonExp()
 		for i, c := range ast.Children {
-			if _, ok := c.(Token); ok {
-				cp.visitExp(c, ast, i, !nonExp)
+			if token, ok := c.(Token); ok {
+				cp.currentLine = token.Line
+				cp.visitExp(token, ast, i, !nonExp)
 			} else {
 				cp.visitAst(c.(*Ast))
 			}
@@ -505,7 +674,7 @@ func (cp *Compiler) generateFoot(sections []string) string {
 		foot += "layout.Render" + base + "("
 		foot += "_buffer, _body"
 	} else if len(sections) > 0 {
-		cp.errorf("expect layout for sections: %s", cp.file)
+		cp.errorf(1, "expect layout for sections: %s", cp.file)
 	}
 
 	args := cp.options.LayoutCache.Get(cp.layout)

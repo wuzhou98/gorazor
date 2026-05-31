@@ -544,8 +544,17 @@ func TestAdditionalCoverage(t *testing.T) {
 		err = GenFile(context.Background(), tmpGohtml, tmpOut, Option{})
 		if err == nil {
 			t.Error("expected error due to invalid import block, got nil")
-		} else if !strings.Contains(err.Error(), "failed to parse imports block") {
-			t.Error("unexpected error:", err)
+		} else {
+			errMsg := err.Error()
+			if !strings.Contains(errMsg, "compilation error in") {
+				t.Error("expected diagnostic prefix, got:", errMsg)
+			}
+			if !strings.Contains(errMsg, "temp_import_err_xyz.gohtml:2") {
+				t.Error("expected filename and line 2, got:", errMsg)
+			}
+			if !strings.Contains(errMsg, "Context:") || !strings.Contains(errMsg, "---> 2: import = 123") {
+				t.Error("expected context snippet highlighting line 2, got:", errMsg)
+			}
 		}
 	})
 
@@ -571,8 +580,17 @@ func TestAdditionalCoverage(t *testing.T) {
 		err = GenFile(context.Background(), tmpGohtml, tmpOut, Option{})
 		if err == nil {
 			t.Error("expected error due to sections with no layout, got nil")
-		} else if !strings.Contains(err.Error(), "expect layout for sections:") {
-			t.Error("unexpected error:", err)
+		} else {
+			errMsg := err.Error()
+			if !strings.Contains(errMsg, "compilation error in") {
+				t.Error("expected diagnostic prefix, got:", errMsg)
+			}
+			if !strings.Contains(errMsg, "temp_section_err_xyz.gohtml:1") {
+				t.Error("expected filename and line 1, got:", errMsg)
+			}
+			if !strings.Contains(errMsg, "Context:") || !strings.Contains(errMsg, "---> 1: @{") {
+				t.Error("expected context snippet highlighting line 1, got:", errMsg)
+			}
 		}
 	})
 
@@ -613,6 +631,56 @@ func TestAdditionalCoverage(t *testing.T) {
 			t.Error("expected error due to cancelled context, got nil")
 		} else if !strings.Contains(err.Error(), "context canceled") {
 			t.Error("unexpected error:", err)
+		}
+	})
+
+	t.Run("html_compact_mode", func(t *testing.T) {
+		tmpOut := filepath.Join(os.TempDir(), "gorazor_compact_out.go")
+		defer os.Remove(tmpOut)
+
+		tmpGohtml := filepath.Join(os.TempDir(), "temp_compact_xyz.gohtml")
+		defer os.Remove(tmpGohtml)
+
+		// Create a file with complex HTML including pre, script, style, and normal spaces/newlines
+		rawHTML := `
+		<div   class="header"   id="top" >
+			<h1>Hello  World!</h1>
+		</div>
+		
+		<pre  class="code-block" >
+			line 1
+			  line 2
+		</pre>
+
+		<script>
+			console.log( "test" );
+		</script>
+
+		<style>
+			body {  margin: 0;  }
+		</style>
+		`
+		err := os.WriteFile(tmpGohtml, []byte(rawHTML), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, Option{CompactMode: true, NoLineNumber: true})
+		if err != nil {
+			t.Fatalf("failed to compile with CompactMode: %v", err)
+		}
+
+		content, err := os.ReadFile(tmpOut)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		contentStr := string(content)
+
+		// The entire markup should be combined into a single, optimized string allocation with compact HTML
+		expectedPayload := `_buffer.WriteString("<div class=\"header\" id=\"top\"><h1>Hello World!</h1></div><pre class=\"code-block\">\n\t\t\tline 1\n\t\t\t  line 2\n\t\t</pre><script>\n\t\t\tconsole.log( \"test\" );\n\t\t</script><style>\n\t\t\tbody {  margin: 0;  }\n\t\t</style>")`
+		if !strings.Contains(contentStr, expectedPayload) {
+			t.Errorf("expected combined compact HTML statement not found in:\n%s", contentStr)
 		}
 	})
 }
