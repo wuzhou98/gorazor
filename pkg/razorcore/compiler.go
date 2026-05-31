@@ -124,7 +124,7 @@ func (cp *Compiler) isLayoutSectionTest(p Part) (is bool, val string) {
 		if line == "if"+p+`==""{` {
 			return true, "if " + p + " == nil {\n"
 		}
-		if line == "if"+p+`!=""{\n` {
+		if line == "if"+p+`!=""{` {
 			return true, "if " + p + " != nil {\n"
 		}
 	}
