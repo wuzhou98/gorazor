@@ -140,3 +140,158 @@ func TestGenerate(t *testing.T) {
 		t.Error("walk")
 	}
 }
+
+func TestAdditionalCoverage(t *testing.T) {
+	t.Run("exists_non_existent", func(t *testing.T) {
+		if exists("non_existent_file_xyz_123") {
+			t.Error("expected false")
+		}
+	})
+
+	t.Run("getValStr_invalid_type", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("expected panic")
+			}
+		}()
+		getValStr(123)
+	})
+
+	t.Run("ast_modestr_default", func(t *testing.T) {
+		badAst := &Ast{Mode: 999}
+		if badAst.ModeStr() != "UNDEF" {
+			t.Error("expected UNDEF")
+		}
+	})
+
+	t.Run("ast_check_panic", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				msg := fmt.Sprint(r)
+				if msg != "Maximum number of elements exceeded." {
+					t.Error("unexpected panic:", msg)
+				}
+			} else {
+				t.Error("expected panic")
+			}
+		}()
+		panicAst := &Ast{}
+		panicAst.Children = make([]interface{}, 100000)
+		panicAst.check()
+	})
+
+	t.Run("ast_pop_empty", func(t *testing.T) {
+		emptyAst := &Ast{}
+		emptyAst.popChild() // should not panic
+		if len(emptyAst.Children) != 0 {
+			t.Error("expected 0 children")
+		}
+	})
+
+	t.Run("ast_debug_and_has_non_exp", func(t *testing.T) {
+		root := &Ast{Mode: PRG, TagName: "root"}
+		child1 := &Ast{Mode: EXP, TagName: "exp_child"}
+		child2 := &Ast{Mode: MKP, TagName: "markup_child"}
+		root.addChild(child1)
+		root.addChild(child2)
+		root.debug(0, 5) // cover debug output
+		root.debug(10, 5) // cover depth limit check
+
+		if !root.hasNonExp() {
+			t.Error("expected hasNonExp to be true")
+		}
+		if child1.hasNonExp() {
+			t.Error("expected child1 (EXP with no children) hasNonExp to be false")
+		}
+	})
+
+	t.Run("parser_skip_token", func(t *testing.T) {
+		parser := &Parser{
+			tokens: []Token{
+				{Type: tkContent, Text: "hello"},
+				{Type: tkContent, Text: "world"},
+			},
+		}
+		parser.skipToken()
+		if parser.peekToken(0).Text != "world" {
+			t.Error("expected next token to be world")
+		}
+	})
+
+	t.Run("genfolder_errors", func(t *testing.T) {
+		err := GenFolder("non_existent_folder_xyz_123", "out", Option{})
+		if err == nil || !strings.Contains(err.Error(), "input directory does not exsit") {
+			t.Error("expected folder not exist error, got:", err)
+		}
+
+		// GenFolder with non-existent outdir
+		baseDir, _ := filepath.Abs(".")
+		casedir := filepath.Join(baseDir, "cases")
+		tmpOut := filepath.Join(os.TempDir(), "gorazor_test_out_dir_xyz_123")
+		defer os.RemoveAll(tmpOut)
+
+		// This should cover outdir creation in GenFolder
+		err = GenFolder(filepath.Join(casedir, "layout"), tmpOut, Option{})
+		if err != nil {
+			t.Error("expected no error in GenFolder, got:", err)
+		}
+	})
+
+	t.Run("noline_option", func(t *testing.T) {
+		baseDir, _ := filepath.Abs(".")
+		casedir := filepath.Join(baseDir, "cases")
+		tmpOut := filepath.Join(os.TempDir(), "gorazor_noline_out.go")
+		defer os.Remove(tmpOut)
+
+		option := Option{NoLineNumber: true}
+		err := GenFile(filepath.Join(casedir, "var.gohtml"), tmpOut, option)
+		if err != nil {
+			t.Error("expected no error, got:", err)
+		}
+
+		content, err := ioutil.ReadFile(tmpOut)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(content), "// [") {
+			t.Error("expected no line hint comments in generated file, but found them")
+		}
+	})
+
+	t.Run("layout_not_found_panic", func(t *testing.T) {
+		tmpOut := filepath.Join(os.TempDir(), "gorazor_layout_panic_out.go")
+		defer os.Remove(tmpOut)
+
+		defer func() {
+			if r := recover(); r != nil {
+				msg := fmt.Sprint(r)
+				if !strings.Contains(msg, "Can't find layout:") {
+					t.Error("unexpected panic:", msg)
+				}
+			} else {
+				t.Error("expected panic")
+			}
+		}()
+
+		// Create a temporary layout file that references a non-existent layout
+		tmpGohtml := filepath.Join(os.TempDir(), "temp_layout_xyz_123.gohtml")
+		defer os.Remove(tmpGohtml)
+
+		err := ioutil.WriteFile(tmpGohtml, []byte(`@{
+	import (
+		"tpl/layout"
+	)
+	layout := layout.NonExistentLayoutNameXYZ
+}
+<div>Hello</div>
+`), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		option := Option{}
+		// This should panic due to missing layout
+		GenFile(tmpGohtml, tmpOut, option)
+	})
+}
+
