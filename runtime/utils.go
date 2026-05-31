@@ -1,5 +1,5 @@
-// Package gorazor name is kept for backward compatity
-package gorazor
+// Package runtime provides runtime helpers for gorazor template engine
+package runtime
 
 import (
 	"fmt"

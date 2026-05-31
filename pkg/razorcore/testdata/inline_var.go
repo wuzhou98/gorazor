@@ -5,7 +5,7 @@
 package cases
 
 import (
-	"github.com/sipin/gorazor/gorazor"
+	gorazor "github.com/sipin/gorazor/runtime"
 	"github.com/sunfmin/gorazortests/models"
 	"io"
 	"strings"

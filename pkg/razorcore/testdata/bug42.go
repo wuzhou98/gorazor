@@ -6,7 +6,7 @@ package cases
 
 import (
 	"Tpl"
-	"github.com/sipin/gorazor/gorazor"
+	gorazor "github.com/sipin/gorazor/runtime"
 	"io"
 	"strings"
 )

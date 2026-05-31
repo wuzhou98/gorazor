@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/sipin/gorazor/gorazor"
+	gorazor "github.com/sipin/gorazor/runtime"
 	"github.com/sipin/gorazor/tests/data"
 )
 

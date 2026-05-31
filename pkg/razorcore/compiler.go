@@ -13,7 +13,7 @@ import (
 )
 
 // GorazorNamespace defines util pkg namespace used in template
-var GorazorNamespace = `"github.com/sipin/gorazor/gorazor"`
+var GorazorNamespace = `gorazor "github.com/sipin/gorazor/runtime"`
 
 // TemplateNamespacePrefix record the namespace prefix for executing folder
 var TemplateNamespacePrefix = ""
