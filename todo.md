@@ -1,8 +1,8 @@
 # Backlog
 
-- [ ] html compact mode option
+- [X] html compact mode option
 - [ ] Return error during rendering?
-- [ ] Better error msg during codegen
+- [X] Better error msg during codegen
 - [ ] Performance Optimize
   - [ ] Auto convert helper func to writer
   - [ ] Unsafe write?
