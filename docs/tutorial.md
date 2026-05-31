@@ -2,8 +2,8 @@
 
 ## Intro
 
-`gorazor` is a translator that generates go code from  `gohtml` files that contain [razory syntax](https://haacked.com/archive/2011/01/06/razor-syntax-quick-reference.aspx/). Every `gohtml` file will be translated into a Go program with a function declared, which will return a `string` value as HTML output. 
-For example the file `demo/intro.gohtml` that contains 
+`gorazor` is a translator that generates Go code from `.gohtml` files that contain [Razor syntax](https://haacked.com/archive/2011/01/06/razor-syntax-quick-reference.aspx/). Every `.gohtml` file will be translated into a Go program with a function declared, which will return a `string` value as HTML output. 
+For example, the file `demo/intro.gohtml` containing:
 ```html
 <p>Hello world</p>
 ``` 
@@ -29,7 +29,7 @@ func RenderHello(_buffer io.StringWriter) {
 }
 ```
 
-Note: put hello.gohtml in a directory, the directory name will be used as package name in go program.
+Note: place `hello.gohtml` inside a directory. The directory name will be used as the package name in the generated Go program.
 ## Create a `Hello world` demo   
 Create the `razor_tut` project that uses Go's built-in [HTTP server](https://gowebexamples.com/http-server/) 
 
@@ -37,7 +37,6 @@ Create the `razor_tut` project that uses Go's built-in [HTTP server](https://gow
 mkdir razor_tut
 cd razor_tut
 go mod init razor_tut
-export GOPATH=$PWD
 ```
 
 Now create `main.go` like this:
@@ -215,11 +214,9 @@ Open [localhost:9999/users](http://localhost:9999/users) to see the userlist
 ![page userlist](img/page_userlist.png)
 
 
-For more details syntax please refer to [Web programming using the Razor syntax](http://www.asp.net/web-pages/tutorials/basics/2-introduction-to-asp-net-web-programming-using-the-razor-syntax).
+For more details about the syntax, please refer to [Introduction to ASP.NET Web Programming Using the Razor Syntax](https://learn.microsoft.com/en-us/aspnet/web-pages/overview/getting-started/introducing-razor-syntax-c).
 
-## Use Javascript in `gohtml` files
-
-And you may also add `javascript` code in `gohtml`, where ctx is `var ctx *web.Context`, details please refer to [sipin/web](http://github.com/sipin/web).
+And you may also add JavaScript code in a `.gohtml` file, where `ctx` is `var ctx *web.Context` (for details, please refer to [sipin/web](https://github.com/sipin/web)).
 
 
 ```javascript

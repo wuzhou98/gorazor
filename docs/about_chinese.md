@@ -4,9 +4,9 @@
 
 前后端分离的并不是所有场景都适用，必然还是会有需要服务器返回页面的场景，特别是需要SEO的页面。
 
-GO内置的模板引擎并不好用，时常为人所诟病，比方说[这里](http://weibo.com/1729408273/B1ZU32ynE)或者[这里](http://www.yinwang.org/blog-cn/2014/04/18/golang)。
+GO内置的模板引擎并不好用，时常为人所诟病，比方说[这里](https://weibo.com/1729408273/B1ZU32ynE)或者[这里](https://www.yinwang.org/blog-cn/2014/04/18/golang)。
 
-我曾经试图适用[mustache](http://mustache.github.io)来缓解这一问题，可惜mustache官方网站的给的[go实现](https://github.com/hoisie/mustache)基本也是个半残废，连dot notation都不支持；当时我果断便[fork出个版本](https://github.com/Wuvist/mustache/commits/master)，增加了dot notation以及lambda等支持。
+我曾经试图适用[mustache](https://mustache.github.io)来缓解这一问题，可惜mustache官方网站的给的[go实现](https://github.com/hoisie/mustache)基本也是个半残废，连dot notation都不支持；当时我果断便[fork出个版本](https://github.com/Wuvist/mustache/commits/master)，增加了dot notation以及lambda等支持。
 
 用是能用，但mustache的这个实现用了大量反射，性能方面我是非常担忧的，并且，mustache的主要优势是在于跨语言，因此功能也是极其有限的，始终也不是什么好用的模板。
 
@@ -62,14 +62,14 @@ asp.net MVC现在的默认模板Razor非常简约。
 逻辑控制？使用原生语言就好了，比方说：
 ```
 	@if(totalMessage == 1) {
-		<p>@Userame has 1 message</p>
+		<p>@Username has 1 message</p>
 	} else {
-		<p>@Userame has @totalMessage messages</p>
+		<p>@Username has @totalMessage messages</p>
 	}
 ```
 它只需要一个 @ 符号来插入代码，后面的 `} else {` 以及括号等等，它的编译器可以自动判断出来是代码还是模板。
 
-我当年第一次看到Razor时非常担心它会把代码跟模板搞混，但用过之后几乎完全没有遇到这方面的问题。实际上，用过razor的程序员，[基本都说爽](http://www.zhihu.com/question/19973649)。
+我当年第一次看到Razor时非常担心它会把代码跟模板搞混，但用过之后几乎完全没有遇到这方面的问题。实际上，用过razor的程序员，[基本都说爽](https://www.zhihu.com/question/19973649)。
 
 没搞.net很多年了，但Razor一直都是我认为设计最优雅的模板，在我使用过node.js jade那样风格的模板后也还是这么认为。
 
@@ -240,9 +240,9 @@ layout模板接受的参数必须是string，并且它是有顺序的；第一�
 	}
 
 	@if(totalMessage == 1) {
-		<p>@Userame has 1 message</p>
+		<p>@Username has 1 message</p>
 	} else {
-		<p>@Userame has @totalMessage messages</p>
+		<p>@Username has @totalMessage messages</p>
 	}
 
 	@section title {

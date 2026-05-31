@@ -5,8 +5,8 @@
 
 # Intro 
 Not all scenarios are suitable for frontend-backend separation. There will still be situations where the server needs to return rendered pages — especially for pages requiring SEO.
-The built-in template engine in Go is not easy to use and has often been criticized — for example [here](http://weibo.com/1729408273/B1ZU32ynE) or [here](http://www.yinwang.org/blog-cn/2014/04/18/golang).
-I once tried to use [mustache](http://mustache.github.io) to alleviate this issue. Unfortunately, the [Go implementation](https://github.com/hoisie/mustache) provided on the official mustache website is almost half-broken — it doesn’t even support dot notation. So, I quickly [forked a version](https://github.com/Wuvist/mustache/commits/master) and added support for dot notation and lambda functions.
+The built-in template engine in Go is not easy to use and has often been criticized — for example [here](https://weibo.com/1729408273/B1ZU32ynE) or [here](https://www.yinwang.org/blog-cn/2014/04/18/golang).
+I once tried to use [mustache](https://mustache.github.io) to alleviate this issue. Unfortunately, the [Go implementation](https://github.com/hoisie/mustache) provided on the official mustache website is almost half-broken — it doesn’t even support dot notation. So, I quickly [forked a version](https://github.com/Wuvist/mustache/commits/master) and added support for dot notation and lambda functions.
 It worked, but this implementation of mustache relies heavily on reflection, which made me very concerned about performance. Furthermore, mustache’s main advantage is language interoperability, so its feature set is quite limited — it’s not a particularly convenient templating system.
 Since I hadn’t yet started full development, I wanted to spend some time clearing these technical obstacles in advance.
 How do we fix Go’s template weakness? Implement or port a new one.
@@ -45,14 +45,14 @@ Logic control? Just use the native language — for example:
 
 ```go
 @if(totalMessage == 1) {
-    <p>@Userame has 1 message</p>
+    <p>@Username has 1 message</p>
 } else {
-    <p>@Userame has @totalMessage messages</p>
+    <p>@Username has @totalMessage messages</p>
 }
 ```
 
 It only needs an `@` to embed code. The compiler automatically determines what’s code and what’s template.
-When I first saw Razor, I worried it might confuse code and markup. But after using it, I almost never encountered that issue. In fact, most developers who’ve used Razor [say it’s delightful](http://www.zhihu.com/question/19973649).
+When I first saw Razor, I worried it might confuse code and markup. But after using it, I almost never encountered that issue. In fact, most developers who’ve used Razor [say it’s delightful](https://www.zhihu.com/question/19973649).
 It’s been years since I’ve done .NET work, but Razor remains, in my opinion, the most elegantly designed template system — even after trying alternatives like Jade in Node.js.
 **Port Razor to Go! Port Razor to Go! Port Razor to Go!**
 That thought wouldn’t leave my head. But I kept suppressing it — startup life is about delivering business value, not tech for tech’s sake!
@@ -194,9 +194,9 @@ When a page template specifies a layout via import, we assume it can’t directl
 }
 
 @if(totalMessage == 1) {
-	<p>@Userame has 1 message</p>
+	<p>@Username has 1 message</p>
 } else {
-	<p>@Userame has @totalMessage messages</p>
+	<p>@Username has @totalMessage messages</p>
 }
 
 @section title {
