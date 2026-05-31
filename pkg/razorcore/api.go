@@ -24,6 +24,9 @@ func GenFile(input string, output string, options Option) error {
 	if !exists(outdir) {
 		os.MkdirAll(outdir, 0775)
 	}
+	if options.LayoutCache == nil {
+		options.LayoutCache = NewLayoutCache()
+	}
 	return generate(input, output, options)
 }
 
@@ -32,6 +35,10 @@ func GenFile(input string, output string, options Option) error {
 func GenFolder(indir string, outdir string, options Option) (err error) {
 	if !exists(indir) {
 		return errors.New("input directory does not exsit")
+	}
+
+	if options.LayoutCache == nil {
+		options.LayoutCache = NewLayoutCache()
 	}
 
 	//Make it

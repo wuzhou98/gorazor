@@ -22,18 +22,25 @@ func TestCap(t *testing.T) {
 	}
 }
 
-func TestLayManager(t *testing.T) {
-	SetLayout("hello", []string{"this", "is", "good"})
-	SetLayout("world", []string{"funny"})
-	if len(LayoutArgs("hello")) != 3 {
+func TestLayoutCache(t *testing.T) {
+	cache := NewLayoutCache()
+	cache.Set("hello", []string{"this", "is", "good"})
+	cache.Set("world", []string{"funny"})
+	if len(cache.Get("hello")) != 3 {
 		t.Error()
 	}
-	if len(LayoutArgs("world")) != 1 {
+	if len(cache.Get("world")) != 1 {
 		t.Error()
 	}
-	if len(LayoutArgs("NO")) != 0 {
+	if len(cache.Get("NO")) != 0 {
 		t.Error()
 	}
+	// test Get/Set with nil cache
+	var nilCache *LayoutCache
+	if len(nilCache.Get("hello")) != 0 {
+		t.Error("expected 0 args for nil cache")
+	}
+	nilCache.Set("hello", []string{"test"}) // should not panic
 }
 
 func TestLexer1(t *testing.T) {
@@ -319,9 +326,13 @@ func TestAdditionalCoverage(t *testing.T) {
 	})
 
 	t.Run("layout_args_zero_sections", func(t *testing.T) {
-		SetLayout("tpl/layout/zero_args", []string{})
+		cache := NewLayoutCache()
+		cache.Set("tpl/layout/zero_args", []string{})
 		cp := &Compiler{
 			layout: "tpl/layout/zero_args",
+			options: Option{
+				LayoutCache: cache,
+			},
 		}
 		foot := cp.generateFoot([]string{"mysection"})
 		if !strings.Contains(foot, ", mysection()") {

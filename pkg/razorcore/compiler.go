@@ -230,13 +230,13 @@ func (cp *Compiler) settleLayout(layoutFunc string) {
 		cp.errorf("Can't find layout: %s [%s]", cp.layout, cp.file)
 	}
 
-	if len(LayoutArgs(cp.layout)) == 0 {
+	if len(cp.options.LayoutCache.Get(cp.layout)) == 0 {
 		//TODO, bad for performance
 		_cp, err := run(path, cp.options)
 		if err != nil {
 			cp.errorf("failed to compile layout %s: %v", path, err)
 		}
-		SetLayout(cp.layout, _cp.params)
+		cp.options.LayoutCache.Set(cp.layout, _cp.params)
 	}
 }
 
@@ -505,7 +505,7 @@ func (cp *Compiler) generateFoot(sections []string) string {
 		cp.errorf("expect layout for sections: %s", cp.file)
 	}
 
-	args := LayoutArgs(cp.layout)
+	args := cp.options.LayoutCache.Get(cp.layout)
 	if len(args) == 0 {
 		for _, sec := range sections {
 			foot += ", " + sec + "()"

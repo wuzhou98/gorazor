@@ -2,36 +2,40 @@ package razorcore
 
 import "sync"
 
-type layoutManager struct {
-	// For gorazor just process on single one gohtml file now
-	// we use an singleton map to keep layout relationship
-	// Not a good solution but works
-	layoutMap map[string][]string
+// LayoutCache provides thread-safe isolation for layout compilations
+type LayoutCache struct {
+	mutex sync.RWMutex
+	m     map[string][]string
 }
 
-var single *layoutManager
-var mutexLock sync.RWMutex
+// NewLayoutCache instantiates a new isolated LayoutCache
+func NewLayoutCache() *LayoutCache {
+	return &LayoutCache{
+		m: make(map[string][]string),
+	}
+}
 
-// LayoutArgs returns arguments of given layout file
-func LayoutArgs(file string) []string {
-	mutexLock.RLock()
-	defer mutexLock.RUnlock()
+// Get returns arguments of a given layout file from the cache
+func (c *LayoutCache) Get(file string) []string {
+	if c == nil {
+		return []string{}
+	}
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 
-	if args, ok := single.layoutMap[file]; ok {
+	if args, ok := c.m[file]; ok {
 		return args
 	}
 	return []string{}
 }
 
-// SetLayout arguments for layout file
-func SetLayout(file string, args []string) {
-	mutexLock.Lock()
-	defer mutexLock.Unlock()
+// Set registers arguments for a layout file in the cache
+func (c *LayoutCache) Set(file string, args []string) {
+	if c == nil {
+		return
+	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
-	single.layoutMap[file] = args
-}
-
-func init() {
-	single = &layoutManager{}
-	single.layoutMap = map[string][]string{}
+	c.m[file] = args
 }

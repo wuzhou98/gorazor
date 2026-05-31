@@ -62,6 +62,7 @@ type Option struct {
 	NameNotChange           bool
 	QuickMode               bool
 	TemplateNamespacePrefix string
+	LayoutCache             *LayoutCache
 }
 
 // TokenMatch store matched token
