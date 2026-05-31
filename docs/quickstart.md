@@ -9,7 +9,7 @@ Welcome to `gorazor`! This guide will walk you through setting up a simple proje
 First, install the `gorazor` command-line tool on your machine:
 
 ```bash
-go install github.com/sipin/gorazor/cmd/gorazor@latest
+go install github.com/sipin/gorazor@latest
 ```
 
 Ensure your Go bin directory (`$GOPATH/bin` or `$HOME/go/bin`) is in your system's `PATH`.
