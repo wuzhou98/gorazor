@@ -71,6 +71,10 @@ ok      github.com/sipin/gorazor/tests  19.921s
 go install github.com/sipin/gorazor@latest
 ```
 
+## Quick Start
+
+Check out our step-by-step [Quick Start Guide](docs/quickstart.md) to build and run your first compiled template in under 5 minutes.
+
 ## Usage
 
 * Process folder: `gorazor template_folder output_folder`

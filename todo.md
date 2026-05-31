@@ -7,9 +7,9 @@
   - [ ] Auto convert helper func to writer
   - [ ] Unsafe write?
 - [ ] VS Code plugin
-- [ ] Quick Start guide
+- [X] Quick Start guide
 - [ ] Dynamic compile?
-- [ ] Support webassembly
+- [X] Support webassembly
 - [ ] Performance Optimize
   - [ ] Auto convert helper func to writer
   - [ ] Unsafe write?
