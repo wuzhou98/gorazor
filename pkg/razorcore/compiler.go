@@ -1,6 +1,7 @@
 package razorcore
 
 import (
+	"context"
 	"fmt"
 	"go/parser"
 	"go/token"
@@ -54,6 +55,7 @@ type Part struct {
 
 // Compiler generate go code for gorazor template
 type Compiler struct {
+	ctx        context.Context
 	inputPath  string
 	tplPath    string
 	ast        *Ast
@@ -174,7 +176,7 @@ func (cp *Compiler) genPart() {
 	cp.buf = res
 }
 
-func makeCompiler(ast *Ast, options Option, input string) *Compiler {
+func makeCompiler(ctx context.Context, ast *Ast, options Option, input string) *Compiler {
 	inputPath, _ := filepath.Abs(input)
 	dir := filepath.Base(filepath.Dir(inputPath))
 	file := strings.Replace(filepath.Base(input), gzExtension, "", 1)
@@ -182,6 +184,7 @@ func makeCompiler(ast *Ast, options Option, input string) *Compiler {
 		file = Capitalize(file)
 	}
 	cp := &Compiler{
+		ctx:    ctx,
 		ast:    ast,
 		buf:    "",
 		layout: "", firstBLK: 0,
@@ -232,7 +235,7 @@ func (cp *Compiler) settleLayout(layoutFunc string) {
 
 	if len(cp.options.LayoutCache.Get(cp.layout)) == 0 {
 		//TODO, bad for performance
-		_cp, err := run(path, cp.options)
+		_cp, err := run(cp.ctx, path, cp.options)
 		if err != nil {
 			cp.errorf("failed to compile layout %s: %v", path, err)
 		}
@@ -671,7 +674,10 @@ func (cp *Compiler) visit() {
 	cp.buf += foot
 }
 
-func run(path string, Options Option) (*Compiler, error) {
+func run(ctx context.Context, path string, Options Option) (*Compiler, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -708,7 +714,7 @@ func run(path string, Options Option) (*Compiler, error) {
 			panic("TYPE")
 		}
 	}
-	cp := makeCompiler(parser.ast, Options, path)
+	cp := makeCompiler(ctx, parser.ast, Options, path)
 	var compileErr error
 	func() {
 		defer func() {
@@ -728,8 +734,8 @@ func run(path string, Options Option) (*Compiler, error) {
 	return cp, nil
 }
 
-func generate(path string, output string, Options Option) error {
-	cp, err := run(path, Options)
+func generate(ctx context.Context, path string, output string, Options Option) error {
+	cp, err := run(ctx, path, Options)
 	if err != nil {
 		return err
 	}

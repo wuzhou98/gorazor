@@ -3,6 +3,7 @@
 package razorcore
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,7 +50,7 @@ func TestGenerateOpt(t *testing.T) {
 		return nil
 	}
 	option := Option{}
-	GenFolder(casedir, testGenDir, option)
+	GenFolder(context.Background(), casedir, testGenDir, option)
 	err := filepath.Walk(casedir, visit)
 	if err != nil {
 		t.Error("walk")

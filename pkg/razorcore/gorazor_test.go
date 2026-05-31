@@ -1,6 +1,7 @@
 package razorcore
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -85,7 +86,7 @@ func TestDebug(t *testing.T) {
 	outdir, _ := filepath.Abs(filepath.Dir("./" + testdata + "/"))
 	option := Option{}
 	option.IsDebug = true
-	GenFile(casedir+"/var.gohtml", outdir+"/_var.gohtml", option)
+	GenFile(context.Background(), casedir+"/var.gohtml", outdir+"/_var.gohtml", option)
 }
 
 func TestGenerate(t *testing.T) {
@@ -116,9 +117,9 @@ func TestGenerate(t *testing.T) {
 						}
 					}
 				}()
-				GenFile(path, log, option)
+				GenFile(context.Background(), path, log, option)
 			} else {
-				GenFile(path, log, option)
+				GenFile(context.Background(), path, log, option)
 			}
 
 			if !exists(cmp) {
@@ -284,7 +285,7 @@ func TestAdditionalCoverage(t *testing.T) {
 	})
 
 	t.Run("run_non_existent", func(t *testing.T) {
-		_, err := run("non_existent_file_xyz_123", Option{})
+		_, err := run(context.Background(), "non_existent_file_xyz_123", Option{})
 		if err == nil {
 			t.Error("expected error")
 		}
@@ -341,7 +342,7 @@ func TestAdditionalCoverage(t *testing.T) {
 	})
 
 	t.Run("genfolder_errors", func(t *testing.T) {
-		err := GenFolder("non_existent_folder_xyz_123", "out", Option{})
+		err := GenFolder(context.Background(), "non_existent_folder_xyz_123", "out", Option{})
 		if err == nil || !strings.Contains(err.Error(), "input directory does not exsit") {
 			t.Error("expected folder not exist error, got:", err)
 		}
@@ -353,7 +354,7 @@ func TestAdditionalCoverage(t *testing.T) {
 		defer os.RemoveAll(tmpOut)
 
 		// This should cover outdir creation in GenFolder
-		err = GenFolder(filepath.Join(casedir, "layout"), tmpOut, Option{})
+		err = GenFolder(context.Background(), filepath.Join(casedir, "layout"), tmpOut, Option{})
 		if err != nil {
 			t.Error("expected no error in GenFolder, got:", err)
 		}
@@ -376,7 +377,7 @@ func TestAdditionalCoverage(t *testing.T) {
 		}
 
 		option := Option{NoLineNumber: true}
-		err = GenFile(tmpGohtml, tmpOut, option)
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, option)
 		if err != nil {
 			t.Error("expected no error, got:", err)
 		}
@@ -412,7 +413,7 @@ func TestAdditionalCoverage(t *testing.T) {
 
 		option := Option{}
 		// This should return an error due to missing layout
-		err = GenFile(tmpGohtml, tmpOut, option)
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, option)
 		if err == nil {
 			t.Error("expected error, got nil")
 		} else if !strings.Contains(err.Error(), "Can't find layout:") {
@@ -436,7 +437,7 @@ func TestAdditionalCoverage(t *testing.T) {
 		os.WriteFile(filepath.Join(inDir, ".#lock.gohtml"), []byte("lock file"), 0644)
 
 		// Call GenFolder on the newly created directories (this also covers outDir not existing, i.e. !exists(outDir) in GenFolder)
-		err := GenFolder(inDir, outDir, Option{})
+		err := GenFolder(context.Background(), inDir, outDir, Option{})
 		if err != nil {
 			t.Fatal("GenFolder failed:", err)
 		}
@@ -452,7 +453,7 @@ func TestAdditionalCoverage(t *testing.T) {
 		// 4. Cover GenFile's output directory creation
 		nonExistentSubDir := filepath.Join(tmpDir, "non_existent_subdir", "output.go")
 		// this will call GenFile and hit the !exists(outdir) branch inside GenFile!
-		err = GenFile(filepath.Join(inDir, "valid.gohtml"), nonExistentSubDir, Option{})
+		err = GenFile(context.Background(), filepath.Join(inDir, "valid.gohtml"), nonExistentSubDir, Option{})
 		if err != nil {
 			t.Fatal("GenFile failed to create outdir:", err)
 		}
@@ -540,7 +541,7 @@ func TestAdditionalCoverage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = GenFile(tmpGohtml, tmpOut, Option{})
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, Option{})
 		if err == nil {
 			t.Error("expected error due to invalid import block, got nil")
 		} else if !strings.Contains(err.Error(), "failed to parse imports block") {
@@ -567,7 +568,7 @@ func TestAdditionalCoverage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = GenFile(tmpGohtml, tmpOut, Option{})
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, Option{})
 		if err == nil {
 			t.Error("expected error due to sections with no layout, got nil")
 		} else if !strings.Contains(err.Error(), "expect layout for sections:") {
@@ -588,9 +589,30 @@ func TestAdditionalCoverage(t *testing.T) {
 	import = 123
 }`), 0644)
 
-		err := GenFolder(inDir, outDir, Option{})
+		err := GenFolder(context.Background(), inDir, outDir, Option{})
 		if err == nil {
 			t.Error("expected error from GenFolder due to invalid syntax in file, got nil")
+		}
+	})
+
+	t.Run("genfolder_context_cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // immediately cancel the context
+
+		tmpDir := filepath.Join(os.TempDir(), "gorazor_cancel_test_dir_xyz")
+		defer os.RemoveAll(tmpDir)
+
+		inDir := filepath.Join(tmpDir, "in")
+		outDir := filepath.Join(tmpDir, "out")
+		os.MkdirAll(inDir, 0755)
+
+		os.WriteFile(filepath.Join(inDir, "valid.gohtml"), []byte("<div>Hello</div>"), 0644)
+
+		err := GenFolder(ctx, inDir, outDir, Option{})
+		if err == nil {
+			t.Error("expected error due to cancelled context, got nil")
+		} else if !strings.Contains(err.Error(), "context canceled") {
+			t.Error("unexpected error:", err)
 		}
 	})
 }

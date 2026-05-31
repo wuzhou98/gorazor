@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.com/sipin/gorazor/pkg/razorcore"
 )
@@ -15,6 +17,9 @@ func usage() {
 }
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	flag.Usage = usage
 	isDebug := flag.Bool("debug", false, "use debug mode")
 	noLine := flag.Bool("noline", false, "skip line number hint in generated code")
@@ -51,14 +56,14 @@ func main() {
 
 	if stat.IsDir() {
 		fmt.Printf("gorazor processing dir: %s -> %s\n", input, output)
-		err := razorcore.GenFolder(input, output, options)
+		err := razorcore.GenFolder(ctx, input, output, options)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
 		}
 	} else if stat.Mode().IsRegular() {
 		fmt.Printf("gorazor processing file: %s -> %s\n", input, output)
-		err := razorcore.GenFile(input, output, options)
+		err := razorcore.GenFile(ctx, input, output, options)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)

@@ -3,6 +3,7 @@ package razorcore
 //------------------------------ API ------------------------------
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -19,7 +20,10 @@ const (
 
 // GenFile generate from input to output file,
 // gofmt will trigger an error if it fails.
-func GenFile(input string, output string, options Option) error {
+func GenFile(ctx context.Context, input string, output string, options Option) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	outdir := filepath.Dir(output)
 	if !exists(outdir) {
 		os.MkdirAll(outdir, 0775)
@@ -27,12 +31,15 @@ func GenFile(input string, output string, options Option) error {
 	if options.LayoutCache == nil {
 		options.LayoutCache = NewLayoutCache()
 	}
-	return generate(input, output, options)
+	return generate(ctx, input, output, options)
 }
 
 // GenFolder generate from directory to directory, Find all the files with extension
 // of .gohtml and generate it into target dir.
-func GenFolder(indir string, outdir string, options Option) (err error) {
+func GenFolder(ctx context.Context, indir string, outdir string, options Option) (err error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !exists(indir) {
 		return errors.New("input directory does not exsit")
 	}
@@ -70,11 +77,21 @@ func GenFolder(indir string, outdir string, options Option) (err error) {
 	var firstErr error
 
 	fun := func(path string, res chan<- string) {
+		if err := ctx.Err(); err != nil {
+			errMutex.Lock()
+			if firstErr == nil {
+				firstErr = err
+			}
+			errMutex.Unlock()
+			res <- fmt.Sprintf("cancelled: %s", path)
+			return
+		}
+
 		//adjust with the abs path, so that we keep the same directory hierarchy
 		input, _ := filepath.Abs(path)
 		output := strings.Replace(input, incdirAbs, outdirAbs, 1)
 		output = strings.ReplaceAll(output, gzExtension, goExtension)
-		genErr := GenFile(path, output, options)
+		genErr := GenFile(ctx, path, output, options)
 		if genErr != nil {
 			errMutex.Lock()
 			if firstErr == nil {
@@ -96,8 +113,16 @@ func GenFolder(indir string, outdir string, options Option) (err error) {
 		go fun(paths[w], result)
 	}
 	for i := 0; i < len(paths); i++ {
-		res := <-result
-		fmt.Println(res)
+		select {
+		case <-ctx.Done():
+			errMutex.Lock()
+			if firstErr == nil {
+				firstErr = ctx.Err()
+			}
+			errMutex.Unlock()
+		case res := <-result:
+			fmt.Println(res)
+		}
 	}
 
 	return firstErr
