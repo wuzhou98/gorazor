@@ -97,7 +97,7 @@ func TestGenerate(t *testing.T) {
 			if !exists(dirname) {
 				os.MkdirAll(dirname, 0755)
 			}
-			option := Option{}
+			option := Option{QuickMode: true}
 
 			if strings.HasSuffix(path, "panic.gohtml") {
 				defer func() {
@@ -133,7 +133,6 @@ func TestGenerate(t *testing.T) {
 		}
 		return nil
 	}
-	QuickMode = true
 	err := filepath.Walk(casedir, visit)
 	if err != nil {
 		t.Error("walk")
@@ -242,13 +241,14 @@ func TestAdditionalCoverage(t *testing.T) {
 
 	t.Run("settleLayout_prefix_adjust", func(t *testing.T) {
 		defer func() {
-			TemplateNamespacePrefix = ""
 			recover() // we expect a panic because the layout file still doesn't exist
 		}()
-		TemplateNamespacePrefix = "myprefix"
 		cp := &Compiler{
 			layout: "myprefix/layout",
 			file:   "somefile",
+			options: Option{
+				TemplateNamespacePrefix: "myprefix",
+			},
 		}
 		cp.settleLayout("NonExistentLayout")
 	})

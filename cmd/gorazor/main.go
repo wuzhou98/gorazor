@@ -35,6 +35,8 @@ func main() {
 	options.IsDebug = *isDebug
 	options.NameNotChange = *nameNotChange
 	options.NoLineNumber = *noLine
+	options.QuickMode = *quick
+	options.TemplateNamespacePrefix = *namespacePrefix
 
 	if len(flag.Args()) != 2 {
 		flag.Usage()
@@ -46,9 +48,6 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	razorcore.TemplateNamespacePrefix = *namespacePrefix
-	razorcore.QuickMode = *quick
 
 	if stat.IsDir() {
 		fmt.Printf("gorazor processing dir: %s -> %s\n", input, output)

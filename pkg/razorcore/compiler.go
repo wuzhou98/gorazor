@@ -15,11 +15,6 @@ import (
 // GorazorNamespace defines util pkg namespace used in template
 var GorazorNamespace = `gorazor "github.com/sipin/gorazor/runtime"`
 
-// TemplateNamespacePrefix record the namespace prefix for executing folder
-var TemplateNamespacePrefix = ""
-
-// QuickMode enabled to skip template optimization
-var QuickMode = false
 
 // ------------------------------ Compiler ------------------------------ //
 const (
@@ -217,16 +212,16 @@ func (cp *Compiler) visitMKP(child Token) {
 func (cp *Compiler) settleLayout(layoutFunc string) {
 	path := cp.layout + "/" + layoutFunc + ".gohtml"
 
-	if !exists(path) && TemplateNamespacePrefix != "" {
-		path = path[len(TemplateNamespacePrefix)+1:]
+	if !exists(path) && cp.options.TemplateNamespacePrefix != "" {
+		path = path[len(cp.options.TemplateNamespacePrefix)+1:]
 	}
 
 	if !exists(path) {
 		layoutFunc = strings.ToLower(layoutFunc[0:1]) + layoutFunc[1:]
 		path = cp.layout + "/" + layoutFunc + ".gohtml"
 
-		if !exists(path) && TemplateNamespacePrefix != "" {
-			path = path[len(TemplateNamespacePrefix)+1:]
+		if !exists(path) && cp.options.TemplateNamespacePrefix != "" {
+			path = path[len(cp.options.TemplateNamespacePrefix)+1:]
 		}
 	}
 
@@ -740,7 +735,7 @@ func generate(path string, output string, Options Option) error {
 	}
 
 	code := FormatBuffer(cp.buf)
-	if !QuickMode {
+	if !Options.QuickMode {
 		_, code = optimize(output, cp.dir, code)
 	}
 

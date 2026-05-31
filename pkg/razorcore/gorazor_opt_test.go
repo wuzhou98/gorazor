@@ -48,7 +48,6 @@ func TestGenerateOpt(t *testing.T) {
 		}
 		return nil
 	}
-	QuickMode = false
 	option := Option{}
 	GenFolder(casedir, testGenDir, option)
 	err := filepath.Walk(casedir, visit)
