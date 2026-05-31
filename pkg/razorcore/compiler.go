@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -76,6 +75,14 @@ type Compiler struct {
 	file       string
 }
 
+type compilerError struct {
+	err error
+}
+
+func (cp *Compiler) errorf(format string, args ...interface{}) {
+	panic(compilerError{err: fmt.Errorf(format, args...)})
+}
+
 func (cp *Compiler) addPart(part Part) {
 	if len(cp.parts) == 0 {
 		cp.parts = append(cp.parts, part)
@@ -118,7 +125,7 @@ func (cp *Compiler) isLayoutSectionTest(p Part) (is bool, val string) {
 	}
 
 	line := strings.TrimSpace(p.value)
-	line = strings.Replace(line, " ", "", -1)
+	line = strings.ReplaceAll(line, " ", "")
 
 	for _, p := range cp.paramNames {
 		if line == "if"+p+`==""{` {
@@ -194,8 +201,8 @@ func makeCompiler(ast *Ast, options Option, input string) *Compiler {
 		cp.isLayout = true
 	}
 
-	cp.inputPath = strings.Replace(input, "\\", "/", -1)
-	cp.tplPath = strings.Replace(cp.inputPath, execDir, "", -1)
+	cp.inputPath = strings.ReplaceAll(input, "\\", "/")
+	cp.tplPath = strings.ReplaceAll(cp.inputPath, execDir, "")
 	return cp
 }
 
@@ -225,14 +232,14 @@ func (cp *Compiler) settleLayout(layoutFunc string) {
 
 	cp.layout = cp.layout + "/" + layoutFunc
 	if !exists(path) {
-		panic("Can't find layout: " + cp.layout + " [" + cp.file + "]")
+		cp.errorf("Can't find layout: %s [%s]", cp.layout, cp.file)
 	}
 
-	if len(LayoutArgs(path)) == 0 {
+	if len(LayoutArgs(cp.layout)) == 0 {
 		//TODO, bad for performance
 		_cp, err := run(path, cp.options)
 		if err != nil {
-			panic(err)
+			cp.errorf("failed to compile layout %s: %v", path, err)
 		}
 		SetLayout(cp.layout, _cp.params)
 	}
@@ -269,8 +276,7 @@ func (cp *Compiler) processImports(content string) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", "package main\n"+content, parser.ImportsOnly)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cp.errorf("failed to parse imports block: %v", err)
 	}
 	
 	for _, s := range f.Imports {
@@ -288,7 +294,7 @@ func (cp *Compiler) processImports(content string) {
 func (cp *Compiler) detectLayoutImport(importPath string) {
 	parts := strings.SplitN(importPath, "/", -1)
 	if len(parts) >= 1 && parts[len(parts)-1] == `layout"` {
-		cp.layout = strings.Replace(importPath, "\"", "", -1)
+		cp.layout = strings.ReplaceAll(importPath, "\"", "")
 	}
 }
 
@@ -501,8 +507,7 @@ func (cp *Compiler) generateFoot(sections []string) string {
 		foot += "layout.Render" + base + "("
 		foot += "_buffer, _body"
 	} else if len(sections) > 0 {
-		fmt.Println("expect layout for sections: " + cp.file)
-		os.Exit(1)
+		cp.errorf("expect layout for sections: %s", cp.file)
 	}
 
 	args := LayoutArgs(cp.layout)
@@ -512,7 +517,7 @@ func (cp *Compiler) generateFoot(sections []string) string {
 		}
 	} else {
 		for _, arg := range args[1:] {
-			arg = strings.Replace(arg, "string", "", -1)
+			arg = strings.ReplaceAll(arg, "string", "")
 			arg = strings.TrimSpace(arg)
 			found := false
 			for _, sec := range sections {
@@ -642,7 +647,7 @@ func (cp *Compiler) visit() {
 	`, fun, cp.tplPath)
 
 		head += "func Render" + fun + "(_buffer io.StringWriter, " +
-			strings.Replace(funcArgs, " string", " func(_buffer io.StringWriter)", -1) + ") {\n"
+			strings.ReplaceAll(funcArgs, " string", " func(_buffer io.StringWriter)") + ") {\n"
 	} else {
 		head += fmt.Sprintf(`
 	// %s generates %s
@@ -672,7 +677,7 @@ func (cp *Compiler) visit() {
 }
 
 func run(path string, Options Option) (*Compiler, error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -696,8 +701,7 @@ func run(path string, Options Option) (*Compiler, error) {
 	parser := &Parser{&Ast{}, nil, res, []Token{}, false, UNK}
 	err = parser.Run()
 	if err != nil {
-		fmt.Println(path, ":", err)
-		os.Exit(2)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 
 	//DEBUG
@@ -710,14 +714,29 @@ func run(path string, Options Option) (*Compiler, error) {
 		}
 	}
 	cp := makeCompiler(parser.ast, Options, path)
-	cp.visit()
+	var compileErr error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if ce, ok := r.(compilerError); ok {
+					compileErr = ce.err
+				} else {
+					panic(r)
+				}
+			}
+		}()
+		cp.visit()
+	}()
+	if compileErr != nil {
+		return nil, compileErr
+	}
 	return cp, nil
 }
 
 func generate(path string, output string, Options Option) error {
 	cp, err := run(path, Options)
-	if err != nil || cp == nil {
-		panic(err)
+	if err != nil {
+		return err
 	}
 
 	code := FormatBuffer(cp.buf)
@@ -725,5 +744,5 @@ func generate(path string, output string, Options Option) error {
 		_, code = optimize(output, cp.dir, code)
 	}
 
-	return ioutil.WriteFile(output, []byte(code), 0644)
+	return os.WriteFile(output, []byte(code), 0644)
 }

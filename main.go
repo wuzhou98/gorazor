@@ -54,10 +54,15 @@ func main() {
 		fmt.Printf("gorazor processing dir: %s -> %s\n", input, output)
 		err := razorcore.GenFolder(input, output, options)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
 		}
 	} else if stat.Mode().IsRegular() {
 		fmt.Printf("gorazor processing file: %s -> %s\n", input, output)
-		razorcore.GenFile(input, output, options)
+		err := razorcore.GenFile(input, output, options)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 	}
 }

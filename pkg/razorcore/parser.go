@@ -184,7 +184,7 @@ func handleTokenAt(parser *Parser, token Token) {
 
 func handelTokenTextareaTagOpen(parser *Parser, token Token) {
 	tagName, _ := regMatch(`(?i)(^<([^\/ >]+))`, token.Text)
-	tagName = strings.Replace(tagName, "<", "", -1)
+	tagName = strings.ReplaceAll(tagName, "<", "")
 	//TODO
 	if parser.ast.TagName != "" {
 		parser.ast = parser.ast.beget(MKP, tagName)
@@ -209,7 +209,7 @@ func (parser *Parser) handleMKP(token Token) error {
 		handelTokenTextareaTagOpen(parser, token)
 	case tkTextareaTagClose, tkHTMLTagClose:
 		tagName, _ := regMatch(`(?i)^<\/([^>]+)`, token.Text)
-		tagName = strings.Replace(tagName, "</", "", -1)
+		tagName = strings.ReplaceAll(tagName, "</", "")
 		//TODO
 		opener := parser.ast.closest(MKP, tagName)
 		if opener.TagName == tagName {
