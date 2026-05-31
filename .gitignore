@@ -4,4 +4,5 @@ _*
 *.exe
 .vscode
 *.out
+/gorazor
 gorazor/test_opt_gen/*.go

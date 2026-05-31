@@ -18,8 +18,8 @@ Gorazor is a Go port of the Razor view engine, providing a fast template compila
 - `gorazor -prefix github.com/sipin/gorazor ./examples/tpl ./examples/tpl` - Generate with namespace prefix
 
 ### Testing and Benchmarking
-- `go test ./...` - Run all tests
-- `go test -bench='Benchmark(Razor|RazorQuick|Quick|HTML)Template' -benchmem github.com/sipin/gorazor/tests` - Run performance benchmarks
+- `go test ./...` - Run all normal tests (excluding benchmarks)
+- `cd tests && go test -bench=.` - Run performance benchmarks (isolated nested module)
 - `make examples` - Regenerate example templates
 - `make bench` - Regenerate benchmark test templates
 

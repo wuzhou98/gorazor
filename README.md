@@ -19,6 +19,7 @@
 * Strong type view model
 * Embedding templates support
 * Layout/Section support
+* **Zero external dependencies**: Both the compiler/generator and the runtime library have zero third-party dependencies, keeping your projects clean and secure.
 
 # Extremely Fast
 
@@ -28,7 +29,7 @@ When using `quicktemplate`'s `ByteBuffer` and `unsafeStrToBytes` method to for t
 
 Benchmark results:
 ```bash
-$ go test -bench='Benchmark(Razor|RazorQuick|Quick|HTML)Template' -benchmem github.com/valyala/quicktemplate/tests github.com/sipin/gorazor/tests
+$ cd tests && go test -bench='Benchmark(Razor|RazorQuick|Quick|HTML)Template' -benchmem
 goos: windows
 goarch: amd64
 pkg: github.com/valyala/quicktemplate/tests
