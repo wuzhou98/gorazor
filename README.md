@@ -68,7 +68,7 @@ ok      github.com/sipin/gorazor/tests  19.921s
 ## Install
 
 ```sh
-go install github.com/sipin/gorazor@latest
+go install github.com/sipin/gorazor/cmd/gorazor@latest
 ```
 
 ## Quick Start
