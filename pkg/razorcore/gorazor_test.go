@@ -1,8 +1,8 @@
 package razorcore
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,18 +23,25 @@ func TestCap(t *testing.T) {
 	}
 }
 
-func TestLayManager(t *testing.T) {
-	SetLayout("hello", []string{"this", "is", "good"})
-	SetLayout("world", []string{"funny"})
-	if len(LayoutArgs("hello")) != 3 {
+func TestLayoutCache(t *testing.T) {
+	cache := NewLayoutCache()
+	cache.Set("hello", []string{"this", "is", "good"})
+	cache.Set("world", []string{"funny"})
+	if len(cache.Get("hello")) != 3 {
 		t.Error()
 	}
-	if len(LayoutArgs("world")) != 1 {
+	if len(cache.Get("world")) != 1 {
 		t.Error()
 	}
-	if len(LayoutArgs("NO")) != 0 {
+	if len(cache.Get("NO")) != 0 {
 		t.Error()
 	}
+	// test Get/Set with nil cache
+	var nilCache *LayoutCache
+	if len(nilCache.Get("hello")) != 0 {
+		t.Error("expected 0 args for nil cache")
+	}
+	nilCache.Set("hello", []string{"test"}) // should not panic
 }
 
 func TestLexer1(t *testing.T) {
@@ -79,7 +86,7 @@ func TestDebug(t *testing.T) {
 	outdir, _ := filepath.Abs(filepath.Dir("./" + testdata + "/"))
 	option := Option{}
 	option.IsDebug = true
-	GenFile(casedir+"/var.gohtml", outdir+"/_var.gohtml", option)
+	GenFile(context.Background(), casedir+"/var.gohtml", outdir+"/_var.gohtml", option)
 }
 
 func TestGenerate(t *testing.T) {
@@ -92,13 +99,13 @@ func TestGenerate(t *testing.T) {
 				return nil
 			}
 			name := strings.Replace(path, ".gohtml", ".go", 1)
-			cmp := strings.Replace(name, sap+"cases"+sap, sap+testdata+sap, -1)
+			cmp := strings.ReplaceAll(name, sap+"cases"+sap, sap+testdata+sap)
 			dirname := filepath.Dir(cmp)
 			log := filepath.Join(dirname, "_"+filepath.Base(cmp))
 			if !exists(dirname) {
 				os.MkdirAll(dirname, 0755)
 			}
-			option := Option{}
+			option := Option{QuickMode: true}
 
 			if strings.HasSuffix(path, "panic.gohtml") {
 				defer func() {
@@ -110,9 +117,9 @@ func TestGenerate(t *testing.T) {
 						}
 					}
 				}()
-				GenFile(path, log, option)
+				GenFile(context.Background(), path, log, option)
 			} else {
-				GenFile(path, log, option)
+				GenFile(context.Background(), path, log, option)
 			}
 
 			if !exists(cmp) {
@@ -121,8 +128,8 @@ func TestGenerate(t *testing.T) {
 				t.Error("No log:", log)
 			} else {
 				//compare the log file and cmp file
-				_cmp, _e1 := ioutil.ReadFile(cmp)
-				_log, _e2 := ioutil.ReadFile(log)
+				_cmp, _e1 := os.ReadFile(cmp)
+				_log, _e2 := os.ReadFile(log)
 				if _e1 != nil || _e2 != nil {
 					t.Error("Reading")
 				} else if string(_cmp) != string(_log) {
@@ -134,7 +141,6 @@ func TestGenerate(t *testing.T) {
 		}
 		return nil
 	}
-	QuickMode = true
 	err := filepath.Walk(casedir, visit)
 	if err != nil {
 		t.Error("walk")
@@ -243,13 +249,14 @@ func TestAdditionalCoverage(t *testing.T) {
 
 	t.Run("settleLayout_prefix_adjust", func(t *testing.T) {
 		defer func() {
-			TemplateNamespacePrefix = ""
 			recover() // we expect a panic because the layout file still doesn't exist
 		}()
-		TemplateNamespacePrefix = "myprefix"
 		cp := &Compiler{
 			layout: "myprefix/layout",
 			file:   "somefile",
+			options: Option{
+				TemplateNamespacePrefix: "myprefix",
+			},
 		}
 		cp.settleLayout("NonExistentLayout")
 	})
@@ -278,7 +285,7 @@ func TestAdditionalCoverage(t *testing.T) {
 	})
 
 	t.Run("run_non_existent", func(t *testing.T) {
-		_, err := run("non_existent_file_xyz_123", Option{})
+		_, err := run(context.Background(), "non_existent_file_xyz_123", Option{})
 		if err == nil {
 			t.Error("expected error")
 		}
@@ -320,9 +327,13 @@ func TestAdditionalCoverage(t *testing.T) {
 	})
 
 	t.Run("layout_args_zero_sections", func(t *testing.T) {
-		SetLayout("tpl/layout/zero_args", []string{})
+		cache := NewLayoutCache()
+		cache.Set("tpl/layout/zero_args", []string{})
 		cp := &Compiler{
 			layout: "tpl/layout/zero_args",
+			options: Option{
+				LayoutCache: cache,
+			},
 		}
 		foot := cp.generateFoot([]string{"mysection"})
 		if !strings.Contains(foot, ", mysection()") {
@@ -331,7 +342,7 @@ func TestAdditionalCoverage(t *testing.T) {
 	})
 
 	t.Run("genfolder_errors", func(t *testing.T) {
-		err := GenFolder("non_existent_folder_xyz_123", "out", Option{})
+		err := GenFolder(context.Background(), "non_existent_folder_xyz_123", "out", Option{})
 		if err == nil || !strings.Contains(err.Error(), "input directory does not exsit") {
 			t.Error("expected folder not exist error, got:", err)
 		}
@@ -343,7 +354,7 @@ func TestAdditionalCoverage(t *testing.T) {
 		defer os.RemoveAll(tmpOut)
 
 		// This should cover outdir creation in GenFolder
-		err = GenFolder(filepath.Join(casedir, "layout"), tmpOut, Option{})
+		err = GenFolder(context.Background(), filepath.Join(casedir, "layout"), tmpOut, Option{})
 		if err != nil {
 			t.Error("expected no error in GenFolder, got:", err)
 		}
@@ -356,7 +367,7 @@ func TestAdditionalCoverage(t *testing.T) {
 		tmpGohtml := filepath.Join(os.TempDir(), "temp_noline_tpl.gohtml")
 		defer os.Remove(tmpGohtml)
 
-		err := ioutil.WriteFile(tmpGohtml, []byte(`@{
+		err := os.WriteFile(tmpGohtml, []byte(`@{
 	var totalMessage int
 }
 <div>Hello @totalMessage</div>
@@ -366,12 +377,12 @@ func TestAdditionalCoverage(t *testing.T) {
 		}
 
 		option := Option{NoLineNumber: true}
-		err = GenFile(tmpGohtml, tmpOut, option)
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, option)
 		if err != nil {
 			t.Error("expected no error, got:", err)
 		}
 
-		content, err := ioutil.ReadFile(tmpOut)
+		content, err := os.ReadFile(tmpOut)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -380,26 +391,15 @@ func TestAdditionalCoverage(t *testing.T) {
 		}
 	})
 
-	t.Run("layout_not_found_panic", func(t *testing.T) {
-		tmpOut := filepath.Join(os.TempDir(), "gorazor_layout_panic_out.go")
+	t.Run("layout_not_found_error", func(t *testing.T) {
+		tmpOut := filepath.Join(os.TempDir(), "gorazor_layout_error_out.go")
 		defer os.Remove(tmpOut)
-
-		defer func() {
-			if r := recover(); r != nil {
-				msg := fmt.Sprint(r)
-				if !strings.Contains(msg, "Can't find layout:") {
-					t.Error("unexpected panic:", msg)
-				}
-			} else {
-				t.Error("expected panic")
-			}
-		}()
 
 		// Create a temporary layout file that references a non-existent layout
 		tmpGohtml := filepath.Join(os.TempDir(), "temp_layout_xyz_123.gohtml")
 		defer os.Remove(tmpGohtml)
 
-		err := ioutil.WriteFile(tmpGohtml, []byte(`@{
+		err := os.WriteFile(tmpGohtml, []byte(`@{
 	import (
 		"tpl/layout"
 	)
@@ -412,8 +412,13 @@ func TestAdditionalCoverage(t *testing.T) {
 		}
 
 		option := Option{}
-		// This should panic due to missing layout
-		GenFile(tmpGohtml, tmpOut, option)
+		// This should return an error due to missing layout
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, option)
+		if err == nil {
+			t.Error("expected error, got nil")
+		} else if !strings.Contains(err.Error(), "Can't find layout:") {
+			t.Error("unexpected error message:", err)
+		}
 	})
 
 	t.Run("genfolder_comprehensive", func(t *testing.T) {
@@ -425,14 +430,14 @@ func TestAdditionalCoverage(t *testing.T) {
 		os.MkdirAll(inDir, 0755)
 
 		// 1. Create a valid .gohtml file
-		ioutil.WriteFile(filepath.Join(inDir, "valid.gohtml"), []byte("<div>Hello</div>"), 0644)
+		os.WriteFile(filepath.Join(inDir, "valid.gohtml"), []byte("<div>Hello</div>"), 0644)
 		// 2. Create a non-.gohtml file (to cover !strings.HasSuffix branch)
-		ioutil.WriteFile(filepath.Join(inDir, "dummy.txt"), []byte("ignore me"), 0644)
+		os.WriteFile(filepath.Join(inDir, "dummy.txt"), []byte("ignore me"), 0644)
 		// 3. Create a Emacs lock file (to cover strings.HasPrefix(\".#\") branch)
-		ioutil.WriteFile(filepath.Join(inDir, ".#lock.gohtml"), []byte("lock file"), 0644)
+		os.WriteFile(filepath.Join(inDir, ".#lock.gohtml"), []byte("lock file"), 0644)
 
 		// Call GenFolder on the newly created directories (this also covers outDir not existing, i.e. !exists(outDir) in GenFolder)
-		err := GenFolder(inDir, outDir, Option{})
+		err := GenFolder(context.Background(), inDir, outDir, Option{})
 		if err != nil {
 			t.Fatal("GenFolder failed:", err)
 		}
@@ -448,7 +453,7 @@ func TestAdditionalCoverage(t *testing.T) {
 		// 4. Cover GenFile's output directory creation
 		nonExistentSubDir := filepath.Join(tmpDir, "non_existent_subdir", "output.go")
 		// this will call GenFile and hit the !exists(outdir) branch inside GenFile!
-		err = GenFile(filepath.Join(inDir, "valid.gohtml"), nonExistentSubDir, Option{})
+		err = GenFile(context.Background(), filepath.Join(inDir, "valid.gohtml"), nonExistentSubDir, Option{})
 		if err != nil {
 			t.Fatal("GenFile failed to create outdir:", err)
 		}
@@ -516,6 +521,166 @@ func TestAdditionalCoverage(t *testing.T) {
 		err := parser.subParse(tok, EXP, true)
 		if err == nil || !strings.Contains(err.Error(), "Unmatched tag close") {
 			t.Error("expected error, got:", err)
+		}
+	})
+
+	t.Run("process_imports_error", func(t *testing.T) {
+		tmpOut := filepath.Join(os.TempDir(), "gorazor_import_err_out.go")
+		defer os.Remove(tmpOut)
+
+		tmpGohtml := filepath.Join(os.TempDir(), "temp_import_err_xyz.gohtml")
+		defer os.Remove(tmpGohtml)
+
+		// Create a file with syntax error in the import statement
+		err := os.WriteFile(tmpGohtml, []byte(`@{
+	import = 123
+}
+<div>Hello</div>
+`), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, Option{})
+		if err == nil {
+			t.Error("expected error due to invalid import block, got nil")
+		} else {
+			errMsg := err.Error()
+			if !strings.Contains(errMsg, "compilation error in") {
+				t.Error("expected diagnostic prefix, got:", errMsg)
+			}
+			if !strings.Contains(errMsg, "temp_import_err_xyz.gohtml:2") {
+				t.Error("expected filename and line 2, got:", errMsg)
+			}
+			if !strings.Contains(errMsg, "Context:") || !strings.Contains(errMsg, "---> 2: import = 123") {
+				t.Error("expected context snippet highlighting line 2, got:", errMsg)
+			}
+		}
+	})
+
+	t.Run("generate_foot_no_layout_sections_error", func(t *testing.T) {
+		tmpOut := filepath.Join(os.TempDir(), "gorazor_section_err_out.go")
+		defer os.Remove(tmpOut)
+
+		tmpGohtml := filepath.Join(os.TempDir(), "temp_section_err_xyz.gohtml")
+		defer os.Remove(tmpGohtml)
+
+		// Create a file with a section but no layout declaration
+		err := os.WriteFile(tmpGohtml, []byte(`@{
+	// No layout assigned
+}
+@section Header {
+	<div>Header</div>
+}
+`), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, Option{})
+		if err == nil {
+			t.Error("expected error due to sections with no layout, got nil")
+		} else {
+			errMsg := err.Error()
+			if !strings.Contains(errMsg, "compilation error in") {
+				t.Error("expected diagnostic prefix, got:", errMsg)
+			}
+			if !strings.Contains(errMsg, "temp_section_err_xyz.gohtml:1") {
+				t.Error("expected filename and line 1, got:", errMsg)
+			}
+			if !strings.Contains(errMsg, "Context:") || !strings.Contains(errMsg, "---> 1: @{") {
+				t.Error("expected context snippet highlighting line 1, got:", errMsg)
+			}
+		}
+	})
+
+	t.Run("genfolder_with_errors", func(t *testing.T) {
+		tmpDir := filepath.Join(os.TempDir(), "gorazor_folder_err_test_xyz")
+		defer os.RemoveAll(tmpDir)
+
+		inDir := filepath.Join(tmpDir, "in")
+		outDir := filepath.Join(tmpDir, "out")
+		os.MkdirAll(inDir, 0755)
+
+		// Create a file with syntax error
+		os.WriteFile(filepath.Join(inDir, "error.gohtml"), []byte(`@{
+	import = 123
+}`), 0644)
+
+		err := GenFolder(context.Background(), inDir, outDir, Option{})
+		if err == nil {
+			t.Error("expected error from GenFolder due to invalid syntax in file, got nil")
+		}
+	})
+
+	t.Run("genfolder_context_cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // immediately cancel the context
+
+		tmpDir := filepath.Join(os.TempDir(), "gorazor_cancel_test_dir_xyz")
+		defer os.RemoveAll(tmpDir)
+
+		inDir := filepath.Join(tmpDir, "in")
+		outDir := filepath.Join(tmpDir, "out")
+		os.MkdirAll(inDir, 0755)
+
+		os.WriteFile(filepath.Join(inDir, "valid.gohtml"), []byte("<div>Hello</div>"), 0644)
+
+		err := GenFolder(ctx, inDir, outDir, Option{})
+		if err == nil {
+			t.Error("expected error due to cancelled context, got nil")
+		} else if !strings.Contains(err.Error(), "context canceled") {
+			t.Error("unexpected error:", err)
+		}
+	})
+
+	t.Run("html_compact_mode", func(t *testing.T) {
+		tmpOut := filepath.Join(os.TempDir(), "gorazor_compact_out.go")
+		defer os.Remove(tmpOut)
+
+		tmpGohtml := filepath.Join(os.TempDir(), "temp_compact_xyz.gohtml")
+		defer os.Remove(tmpGohtml)
+
+		// Create a file with complex HTML including pre, script, style, and normal spaces/newlines
+		rawHTML := `
+		<div   class="header"   id="top" >
+			<h1>Hello  World!</h1>
+		</div>
+		
+		<pre  class="code-block" >
+			line 1
+			  line 2
+		</pre>
+
+		<script>
+			console.log( "test" );
+		</script>
+
+		<style>
+			body {  margin: 0;  }
+		</style>
+		`
+		err := os.WriteFile(tmpGohtml, []byte(rawHTML), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = GenFile(context.Background(), tmpGohtml, tmpOut, Option{CompactMode: true, NoLineNumber: true})
+		if err != nil {
+			t.Fatalf("failed to compile with CompactMode: %v", err)
+		}
+
+		content, err := os.ReadFile(tmpOut)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		contentStr := string(content)
+
+		// The entire markup should be combined into a single, optimized string allocation with compact HTML
+		expectedPayload := `_buffer.WriteString("<div class=\"header\" id=\"top\"><h1>Hello World!</h1></div><pre class=\"code-block\">\n\t\t\tline 1\n\t\t\t  line 2\n\t\t</pre><script>\n\t\t\tconsole.log( \"test\" );\n\t\t</script><style>\n\t\t\tbody {  margin: 0;  }\n\t\t</style>")`
+		if !strings.Contains(contentStr, expectedPayload) {
+			t.Errorf("expected combined compact HTML statement not found in:\n%s", contentStr)
 		}
 	})
 }

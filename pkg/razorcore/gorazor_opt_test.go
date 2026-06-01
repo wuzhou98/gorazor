@@ -3,7 +3,7 @@
 package razorcore
 
 import (
-	"io/ioutil"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,8 +27,8 @@ func TestGenerateOpt(t *testing.T) {
 				return nil
 			}
 			name := strings.Replace(path, ".gohtml", ".go", 1)
-			cmp := strings.Replace(name, sap+casesOpt+sap, sap+testOpt+sap, -1)
-			log := strings.Replace(name, sap+casesOpt+sap, sap+testOptGen+sap, -1)
+			cmp := strings.ReplaceAll(name, sap+casesOpt+sap, sap+testOpt+sap)
+			log := strings.ReplaceAll(name, sap+casesOpt+sap, sap+testOptGen+sap)
 
 			if !exists(cmp) {
 				t.Error("No cmp:", cmp)
@@ -36,8 +36,8 @@ func TestGenerateOpt(t *testing.T) {
 				t.Error("No log:", log)
 			} else {
 				//compare the log file and cmp file
-				_cmp, _e1 := ioutil.ReadFile(cmp)
-				_log, _e2 := ioutil.ReadFile(log)
+				_cmp, _e1 := os.ReadFile(cmp)
+				_log, _e2 := os.ReadFile(log)
 				if _e1 != nil || _e2 != nil {
 					t.Error("Reading")
 				} else if string(_cmp) != string(_log) {
@@ -49,9 +49,8 @@ func TestGenerateOpt(t *testing.T) {
 		}
 		return nil
 	}
-	QuickMode = false
 	option := Option{}
-	GenFolder(casedir, testGenDir, option)
+	GenFolder(context.Background(), casedir, testGenDir, option)
 	err := filepath.Walk(casedir, visit)
 	if err != nil {
 		t.Error("walk")

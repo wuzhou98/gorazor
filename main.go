@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.com/sipin/gorazor/pkg/razorcore"
 )
@@ -15,6 +17,9 @@ func usage() {
 }
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	flag.Usage = usage
 	isDebug := flag.Bool("debug", false, "use debug mode")
 	noLine := flag.Bool("noline", false, "skip line number hint in generated code")
@@ -22,6 +27,7 @@ func main() {
 	quick := flag.Bool("q", false, "enable quick mode; skip template render optimzation")
 	namespacePrefix := flag.String("prefix", "", "tpl namespace prefix")
 	nameNotChange := flag.Bool("nameNotChange", false, "do not change name of the template")
+	compact := flag.Bool("compact", false, "enable compact mode; minify generated HTML")
 
 	flag.Parse()
 
@@ -35,6 +41,9 @@ func main() {
 	options.IsDebug = *isDebug
 	options.NameNotChange = *nameNotChange
 	options.NoLineNumber = *noLine
+	options.QuickMode = *quick
+	options.TemplateNamespacePrefix = *namespacePrefix
+	options.CompactMode = *compact
 
 	if len(flag.Args()) != 2 {
 		flag.Usage()
@@ -47,17 +56,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	razorcore.TemplateNamespacePrefix = *namespacePrefix
-	razorcore.QuickMode = *quick
-
 	if stat.IsDir() {
 		fmt.Printf("gorazor processing dir: %s -> %s\n", input, output)
-		err := razorcore.GenFolder(input, output, options)
+		err := razorcore.GenFolder(ctx, input, output, options)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
 		}
 	} else if stat.Mode().IsRegular() {
 		fmt.Printf("gorazor processing file: %s -> %s\n", input, output)
-		razorcore.GenFile(input, output, options)
+		err := razorcore.GenFile(ctx, input, output, options)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 	}
 }

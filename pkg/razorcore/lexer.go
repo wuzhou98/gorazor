@@ -57,9 +57,13 @@ var typeStr = [...]string{
 
 // Option have following options:
 type Option struct {
-	IsDebug       bool
-	NoLineNumber  bool
-	NameNotChange bool
+	IsDebug                 bool
+	NoLineNumber            bool
+	NameNotChange           bool
+	QuickMode               bool
+	TemplateNamespacePrefix string
+	LayoutCache             *LayoutCache
+	CompactMode             bool
 }
 
 // TokenMatch store matched token
@@ -98,8 +102,8 @@ type Token struct {
 
 // P for print
 func (token Token) P() {
-	textStr := strings.Replace(token.Text, "\n", "\\n", -1)
-	textStr = strings.Replace(textStr, "\t", "\\t", -1)
+	textStr := strings.ReplaceAll(token.Text, "\n", "\\n")
+	textStr = strings.ReplaceAll(textStr, "\t", "\\t")
 	fmt.Printf("Token: %-20s Location:(%-2d %-2d) Value: %s\n",
 		token.TypeStr, token.Line, token.Pos, textStr)
 }
@@ -194,7 +198,7 @@ func tryPeekNext(text string) (match string, tokVal int, ok bool) {
 // Scan return gorazor doc as list for Token
 func (lexer *Lexer) Scan() ([]Token, error) {
 	toks := []Token{}
-	text := strings.Replace(lexer.Text, "\r\n", "\n", -1)
+	text := strings.ReplaceAll(lexer.Text, "\r\n", "\n")
 	text += "\n"
 	cur, line, pos := 0, 1, 0
 	for cur < len(text) {
